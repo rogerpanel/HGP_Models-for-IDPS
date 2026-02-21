@@ -1,0 +1,1219 @@
+% SUPPLEMENTARY APPENDIX
+% Uncertainty-Calibrated Hierarchical Gaussian Processes for Intrusion Detection
+\documentclass[12pt]{article}
+
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{array}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{hyperref}
+
+% Mathematical notation
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator{\Tr}{Tr}
+\DeclareMathOperator{\diag}{diag}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\X}{\mathcal{X}}
+
+% Theorem environments
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{proof_sketch}{Proof}
+
+\title{Supplementary Appendix: \\
+Uncertainty-Calibrated Hierarchical Gaussian Processes \\
+for Intrusion Detection with Multi-Scale Temporal Modeling}
+
+\author{Roger Nick Anaedevha, Alexander Gennadevich Trofimov, \\
+Yuri Vladimirovich Borodachev}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Appendix A: Detailed Feature Specifications}
+
+\subsection{A.1 Edge-IIoT Feature Space}
+
+The Edge-IIoT domain exhibits protocol-dependent feature dimensionality ranging from 60 to 140 features. Features are organized into four categories:
+
+\subsubsection{Protocol-Specific Features}
+\begin{itemize}
+\item MQTT Protocol: \texttt{mqtt.msgtype} $\in \{0,1,...,15\}$, \texttt{mqtt.topic}, \texttt{mqtt.qos} $\in \{0,1,2\}$, \texttt{mqtt.retain}, \texttt{mqtt.dup}
+\item Modbus Protocol: \texttt{modbus.func\_code} $\in \{1,...,127\}$, \texttt{modbus.transaction\_id}, \texttt{modbus.unit\_id}, \texttt{modbus.reference}, \texttt{modbus.word\_cnt}
+\item HTTP Protocol: \texttt{http.request.method} $\in \{$GET, POST, PUT, DELETE, HEAD$\}$, \texttt{http.response.code}, \texttt{http.content\_length}, \texttt{http.user\_agent}
+\end{itemize}
+
+\subsubsection{Flow Characteristics}
+\begin{itemize}
+\item Duration: \texttt{flow.duration} (seconds)
+\item Byte counts: \texttt{total\_fwd\_bytes}, \texttt{total\_bwd\_bytes}
+\item Packet counts: \texttt{total\_fwd\_packets}, \texttt{total\_bwd\_packets}
+\item Flag counts: \texttt{fwd\_PSH\_flags}, \texttt{bwd\_PSH\_flags}, \texttt{fwd\_URG\_flags}, \texttt{bwd\_URG\_flags}
+\end{itemize}
+
+\subsubsection{Timing Features}
+\begin{itemize}
+\item Inter-arrival times: \texttt{flow.IAT.mean}, \texttt{flow.IAT.std}, \texttt{flow.IAT.min}, \texttt{flow.IAT.max}
+\item Protocol timing: \texttt{tcp.time\_delta}, \texttt{udp.time\_delta} (microsecond precision)
+\item Active/Idle times: \texttt{active.mean}, \texttt{active.std}, \texttt{idle.mean}, \texttt{idle.std}
+\end{itemize}
+
+\subsubsection{Statistical Attributes}
+\begin{itemize}
+\item Entropy: \texttt{payload\_entropy}, \texttt{header\_entropy}
+\item Rates: \texttt{byte\_rate}, \texttt{packet\_rate}
+\item Variations: \texttt{packet\_size\_variation}, \texttt{IAT\_variation}
+\end{itemize}
+
+\subsection{A.2 Container Feature Space}
+
+Container environments maintain fixed dimensionality $D=87$ based on CICFlowMeter feature extraction. Features capture bidirectional flow statistics:
+
+\subsubsection{Forward Direction Features (40 features)}
+\begin{itemize}
+\item Packet statistics: count, total bytes, mean/std/min/max lengths
+\item IAT statistics: mean/std/min/max inter-arrival times
+\item Flag counts: PSH, URG, SYN, FIN, RST, ACK flags
+\item Header lengths: mean/std/min/max
+\item Bulk transfer: avg bytes/packets/rate bulk
+\end{itemize}
+
+\subsubsection{Backward Direction Features (40 features)}
+Symmetric feature set for backward direction traffic with identical statistical measures
+
+\subsubsection{Bidirectional Features (7 features)}
+\begin{itemize}
+\item Flow duration (seconds)
+\item Down/Up ratio
+\item Average packet size
+\item Subflow statistics
+\item Active/Idle time ratios
+\end{itemize}
+
+\subsection{A.3 SOC Feature Space}
+
+SOC systems operate with $D=46$ features capturing entity relationships and temporal aggregations:
+
+\subsubsection{Entity Features (18 features)}
+\begin{itemize}
+\item Source entity: IP address (hashed), port, entity type, role
+\item Destination entity: IP address (hashed), port, entity type, role
+\item User entity: username (hashed), authentication method, privilege level
+\item Asset entity: hostname, OS type, criticality score
+\end{itemize}
+
+\subsubsection{Alert Features (12 features)}
+\begin{itemize}
+\item Alert metadata: severity $\in \{$Low, Medium, High, Critical$\}$, confidence score, rule ID
+\item Alert classification: category, subcategory, MITRE ATT\&CK technique ID
+\item Alert source: sensor ID, detection method
+\end{itemize}
+
+\subsubsection{Temporal Aggregations (16 features)}
+\begin{itemize}
+\item 1-hour window: alert count, unique sources, unique destinations, mean severity
+\item 24-hour window: alert count, unique sources, unique destinations, mean severity
+\item 7-day window: alert count, unique sources, unique destinations, mean severity
+\item Trend indicators: rate of change, periodicity score
+\end{itemize}
+
+\section{Appendix B: Adversarial Threat Model and Operational Constraints}
+
+\subsection{B.1 Adversarial Threat Model Details}
+
+\subsubsection{Knowledge Model}
+The adversary possesses:
+\begin{itemize}
+\item Complete model architecture including GP kernel specifications
+\item Training data characteristics and distribution
+\item Detection threshold values and adaptive thresholding mechanism
+\item Inducing point locations
+\end{itemize}
+
+\subsubsection{Capability Model}
+Perturbation constraints by domain:
+
+\textbf{Edge-IIoT Domain:}
+\begin{itemize}
+\item $\|\delta\|_2 \leq \epsilon$ with $\epsilon \in [0.001, 0.1]$
+\item Protocol fields must remain valid (e.g., MQTT message types $\in \{0,...,15\}$)
+\item Timing perturbations limited to $\pm 10\%$ of original values
+\item Byte counts must remain non-negative integers
+\end{itemize}
+
+\textbf{Container Domain:}
+\begin{itemize}
+\item Flow statistics must maintain physical consistency (e.g., packet counts $\geq 0$)
+\item IAT modifications bounded by $\pm 20\%$ to preserve realistic timing
+\item Flag counts cannot exceed packet counts
+\item Direction-specific constraints (forward/backward consistency)
+\end{itemize}
+
+\textbf{SOC Domain:}
+\begin{itemize}
+\item Entity relationships must remain consistent (source-destination pairs)
+\item Severity modifications limited to adjacent categories
+\item Temporal aggregation perturbations bounded by statistical variance
+\item Alert metadata must maintain semantic coherence
+\end{itemize}
+
+\subsubsection{Objective Function}
+The adversary seeks to maximize evasion probability while preserving attack functionality:
+\begin{equation}
+\delta^* = \argmin_{\delta \in \Delta_{\epsilon}^{(d)}} \max_{y \in \mathcal{C}_{\text{malicious}}} p(y|\mathbf{x}^{(d)} + \delta, t)
+\end{equation}
+subject to domain-specific validity constraints $\mathbf{x}^{(d)} + \delta \in \mathcal{X}_{\text{valid}}^{(d)}$.
+
+\subsection{B.2 Operational Constraints}
+
+\subsubsection{Real-Time Processing Requirements}
+Domain-specific Service Level Agreements (SLAs):
+\begin{itemize}
+\item Edge-IIoT: $\tau_{\text{latency}} \leq 10$ms, throughput $\geq 25$K events/s
+\item Container: $\tau_{\text{latency}} \leq 15$ms, throughput $\geq 20$K flows/s  
+\item SOC: $\tau_{\text{latency}} \leq 100$ms, throughput $\geq 10$K alerts/s
+\end{itemize}
+
+\subsubsection{Resource Constraints}
+\begin{itemize}
+\item Memory: Maximum 10GB per domain instance
+\item GPU: Inference limited to 2× T4 GPUs
+\item CPU: 128 cores shared across domains
+\item Network: 10Gbps ingress bandwidth
+\end{itemize}
+
+\subsubsection{Accuracy Requirements}
+\begin{itemize}
+\item Minimum accuracy: 95\% across all domains
+\item Maximum false positive rate: 5\% (operational target: 3\%)
+\item Minimum recall for critical attacks: 90\%
+\item Calibration error (ECE): $< 0.05$
+\end{itemize}
+
+\section{Appendix C: Proof of Hierarchical Decomposition}
+
+\subsection{C.1 Karhunen-Loève Expansion}
+
+The hierarchical decomposition follows from the Karhunen-Loève expansion under separability assumptions. For a covariance function $C(\mathbf{x},t;\mathbf{x}',t')$ with separable structure, we have the eigenfunction decomposition.
+
+\subsection{C.2 Tensor Product RKHS Theory}
+
+For product kernels of the form $K = k_1 \otimes k_2$, Mercer's theorem guarantees eigenfunctions factor as:
+\begin{equation}
+\psi_{ij}(\mathbf{x}_1, \mathbf{x}_2) = \psi_i^{(1)}(\mathbf{x}_1) \cdot \psi_j^{(2)}(\mathbf{x}_2)
+\end{equation}
+with eigenvalues $\lambda_{ij} = \lambda_i^{(1)} \cdot \lambda_j^{(2)}$. This follows from the tensor product structure of reproducing kernel Hilbert spaces: when $\mathcal{H} = \mathcal{H}_1 \otimes \mathcal{H}_2$, the reproducing property factorizes.
+
+\subsection{C.3 Functional ANOVA Decomposition}
+
+The additive decomposition $f = f_{\text{shared}} + f_{\text{domain}} + f_{\text{interact}}$ corresponds to functional ANOVA where each component captures orthogonal variance contributions. The centering transformation ensures uniqueness.
+
+\subsection{C.4 Empirical Validation of Separability}
+
+We validate the separability assumption through comprehensive ablation studies measuring truncation remainder norms $\|r_K\|_2$ for decompositions with $K = 1, 2, 3$ components.
+
+\begin{table}[H]
+\centering
+\caption{Truncation Remainder Norms Across Domains}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Domain} & \textbf{K=1} & \textbf{K=2} & \textbf{K=3} & \textbf{Variance Captured} \\
+\midrule
+Edge-IIoT & 0.187 & 0.034 & 0.008 & 99.2\% \\
+Container & 0.203 & 0.041 & 0.009 & 99.1\% \\
+SOC & 0.215 & 0.038 & 0.007 & 99.3\% \\
+\bottomrule
+\end{tabular}
+\label{tab:separability}
+\end{table}
+
+Results show $\|r_3\|_2 < 0.01$ for all domains, confirming the decomposition captures over 99\% of variance. For SOC data specifically, we measured feature-time correlation matrices:
+
+\begin{itemize}
+\item Total feature-time pairs: 1,288 (46 features × 28 time bins)
+\item Pairs with $|\rho| < 0.15$: 1,215 (94.3\%)
+\item Pairs with $|\rho| \in [0.15, 0.30]$: 68 (5.3\%)
+\item Pairs with $|\rho| > 0.30$: 5 (0.4\%)
+\end{itemize}
+
+The low correlation supports approximate independence. Scenarios where separability may break down include coordinated attack propagation with strong spatial-temporal coupling ($\rho > 0.5$ observed in 0.4\% of cases), primarily for distributed denial-of-service attacks with correlated multi-source patterns.
+
+\section{Appendix C: Proof of Hierarchical Decomposition}
+
+\begin{proof_sketch}[Proof of Proposition 1]
+We establish the hierarchical decomposition through Karhunen–Loève expansion under separability assumptions.
+
+\textbf{Step 1: Separability Assumption}
+Let $f:\mathcal{X}\times\mathbb{R}^+\!\to\mathbb{R}$ be square-integrable with covariance operator $K$ having eigenfunctions $\{\phi_i(\mathbf{x})\psi_j(t)\}$ that are separable in $(\mathbf{x},t)$.
+
+\textbf{Step 2: Karhunen–Loève Expansion}
+The function admits the expansion:
+\begin{equation}
+f(\mathbf{x}^{(d)}, t) = \sum_{i=1}^{\infty}\sum_{j=1}^{\infty} w_{ij} \phi_i(\mathbf{x}^{(d)}) \psi_j(t)
+\end{equation}
+where $w_{ij} \sim \N(0, \lambda_{ij})$ are Gaussian weights with eigenvalues $\lambda_{ij}$.
+
+\textbf{Step 3: Grouping by Domain Characteristics}
+Let $\pi:\mathcal{X}^{(d)}\!\to\mathcal{Z}$ denote projection to shared latent space. Partition eigenfunctions:
+\begin{itemize}
+\item Shared: $\phi_i^{\text{shared}}(\pi(\mathbf{x}^{(d)}))$ for $i \in I_{\text{shared}}$
+\item Domain-specific: $\phi_i^{(d)}(\mathbf{x}^{(d)})$ for $i \in I_d$
+\item Interaction: $\phi_i^{\text{interact}}(\mathbf{x}^{(d)})$ for $i \in I_{\text{interact}}$
+\end{itemize}
+
+\textbf{Step 4: Finite Truncation}
+For truncation level $K$, define:
+\begin{align}
+f_{\text{shared}}(\pi(\mathbf{x}^{(d)}), t) &= \sum_{i \in I_{\text{shared}}, |i| \leq K} w_i \phi_i^{\text{shared}}(\pi(\mathbf{x}^{(d)})) \psi_i(t)\\
+f_{\text{domain}}^{(d)}(\mathbf{x}^{(d)}, t) &= \sum_{i \in I_d, |i| \leq K} w_i \phi_i^{(d)}(\mathbf{x}^{(d)}) \psi_i(t)\\
+f_{\text{interact}}^{(d)}(\mathbf{x}^{(d)}, t) &= \sum_{i \in I_{\text{interact}}, |i| \leq K} w_i \phi_i^{\text{interact}}(\mathbf{x}^{(d)}) \psi_i(t)
+\end{align}
+
+The truncation error satisfies:
+\begin{equation}
+\|r_K\|_2^2 = \sum_{|i|>K} \lambda_i \to 0 \text{ as } K \to \infty
+\end{equation}
+by square-integrability.
+
+\textbf{Step 5: GP Prior Justification}
+Each component with Gaussian weights $w_i \sim \N(0, \lambda_i)$ induces a GP prior:
+\begin{equation}
+f_{\text{component}} \sim \mathcal{GP}\left(0, \sum_{i} \lambda_i \phi_i(\cdot)\phi_i(\cdot')\psi_i(\cdot)\psi_i(\cdot')\right)
+\end{equation}
+
+This completes the decomposition with GP components as the standard Bayesian choice for modeling each term.
+\end{proof_sketch}
+
+\section{Appendix D: Complete Kernel Specifications}
+
+\subsection{D.1 Edge-IIoT Kernels}
+
+\subsubsection{Protocol Kernel}
+For categorical protocol features with learned embeddings $\mathbf{e}: \text{Cat} \to \R^{d_e}$:
+\begin{equation}
+k_{\text{proto}}(\mathbf{x}_p, \mathbf{x'}_p) = \exp\left(-\frac{1}{2}\sum_{i \in \text{proto}} \frac{\|\mathbf{e}(x_{p,i}) - \mathbf{e}(x'_{p,i})\|^2}{\ell_{\text{proto},i}^2}\right)
+\end{equation}
+
+\subsubsection{Flow Kernel}
+For continuous flow features:
+\begin{equation}
+k_{\text{flow}}(\mathbf{x}_f, \mathbf{x'}_f) = \sigma_f^2 \exp\left(-\frac{1}{2}\sum_{i \in \text{flow}} \frac{(x_{f,i} - x'_{f,i})^2}{\ell_{f,i}^2}\right)
+\end{equation}
+
+\subsubsection{Temporal Kernel}
+Multi-scale RBF composition:
+\begin{equation}
+k_{\text{temporal}}^{(\text{Edge})}(t, t') = \sum_{j=1}^7 w_j \sigma_j^2 \exp\left(-\frac{(t-t')^2}{2\ell_j^2}\right)
+\end{equation}
+with lengthscales $\ell_j \in \{10^{-6}, 10^{-5}, 10^{-3}, 1, 60, 3600, 604800\}$ seconds.
+
+\subsection{D.2 Container Kernels}
+
+\subsubsection{IAT Kernel}
+Using 2-Wasserstein distance between empirical IAT distributions:
+\begin{equation}
+k_{\text{IAT}}(\mathbf{x}, \mathbf{x'}) = \sigma_{\text{IAT}}^2 \exp\left(-\frac{W_2^2(\mathcal{P}_{\text{IAT}}(\mathbf{x}), \mathcal{P}_{\text{IAT}}(\mathbf{x'}))}{\ell_{\text{IAT}}^2}\right)
+\end{equation}
+where $\mathcal{P}_{\text{IAT}}$ constructs empirical distribution from IAT statistics.
+
+\subsubsection{Packet Size Kernel}
+\begin{equation}
+k_{\text{packet}}(\mathbf{x}, \mathbf{x'}) = \sigma_p^2 \exp\left(-\frac{1}{2}\sum_{i \in \text{packet}} \frac{(x_i - x'_i)^2}{\ell_{p,i}^2}\right)
+\end{equation}
+
+\subsubsection{Burst Kernel}
+For bulk transfer characteristics:
+\begin{equation}
+k_{\text{burst}}(\mathbf{x}, \mathbf{x'}) = \sigma_b^2 \prod_{i \in \text{bulk}} \exp\left(-\frac{(x_i - x'_i)^2}{2\ell_{b,i}^2}\right)
+\end{equation}
+
+\subsection{D.3 SOC Kernels}
+
+\subsubsection{Graph Kernel}
+For entity relationship graphs $\mathcal{G}(\mathbf{x})$:
+\begin{equation}
+k_{\text{graph}}(\mathcal{G}, \mathcal{G'}) = \sum_{p=1}^P w_p k_{\text{path}}^{(p)}(\mathcal{G}, \mathcal{G'})
+\end{equation}
+where $k_{\text{path}}^{(p)}$ measures similarity of metapaths of length $p$.
+
+\subsubsection{Alert Kernel}
+For alert feature vectors:
+\begin{equation}
+k_{\text{alert}}(\mathbf{a}, \mathbf{a'}) = k_{\text{sev}}(s, s') \cdot k_{\text{cat}}(c, c') \cdot k_{\text{conf}}(\text{conf}, \text{conf}')
+\end{equation}
+with severity kernel, category kernel, and confidence kernel components.
+
+\subsection{D.4 Multi-Scale Temporal Kernels}
+
+\subsubsection{RBF Components}
+Seven RBF kernels spanning temporal scales:
+\begin{equation}
+k_{\mathrm{RBF}}^{(j)}(t,t') = \sigma_j^2 \exp\left(-\frac{(t-t')^2}{2\ell_j^2}\right), \quad j=1,...,7
+\end{equation}
+
+\subsubsection{Periodic Components}
+For cyclical patterns:
+\begin{equation}
+k_{\mathrm{per}}^{(l)}(t,t') = \sigma_{p,l}^2 \exp\left(-\frac{2\sin^2(\pi|t-t'|/\tau_l)}{\ell_{p,l}^2}\right)
+\end{equation}
+with periods $\tau_l \in \{3600, 86400, 604800\}$ seconds (hourly/daily/weekly).
+
+\subsubsection{Change-Point Components}
+For regime transitions:
+\begin{equation}
+k_{\mathrm{change}}(t,t') = \sigma_c^2 \sigma(t-t_c) \sigma(t'-t_c) k_{\mathrm{base}}(t,t')
+\end{equation}
+where $\sigma(\cdot)$ is sigmoid function and $t_c$ is change-point location.
+
+\subsection{D.4 Kernel Centering for Identifiability}
+
+For additive kernels $K = k_1 + k_2 + \cdots + k_J$, the decomposition is not unique without constraints. We ensure identifiability through kernel centering following the functional ANOVA framework.
+
+\subsubsection{Centering Transformation}
+
+Each component kernel undergoes the transformation:
+\begin{equation}
+\tilde{k}_i(\mathbf{x},\mathbf{x}') = k_i(\mathbf{x},\mathbf{x}') - \int k_i(\mathbf{x},\cdot)d\mu - \int k_i(\cdot,\mathbf{x}')d\mu + \iint k_i d\mu^2
+\end{equation}
+
+This forces orthogonality: $\int \tilde{k}_i(\mathbf{x},\cdot)d\mu(\mathbf{x}) = 0$.
+
+\subsubsection{Empirical Implementation}
+
+The empirical input distribution approximates $\mu$ via Monte Carlo integration over training data $\{\mathbf{x}_n\}_{n=1}^N$:
+\begin{align}
+\tilde{k}_i(\mathbf{x},\mathbf{x}') &\approx k_i(\mathbf{x},\mathbf{x}') - \frac{1}{N}\sum_{n=1}^N k_i(\mathbf{x},\mathbf{x}_n) \\
+&\quad - \frac{1}{N}\sum_{n=1}^N k_i(\mathbf{x}_n,\mathbf{x}') + \frac{1}{N^2}\sum_{n,m=1}^N k_i(\mathbf{x}_n,\mathbf{x}_m)
+\end{align}
+
+\subsubsection{Scale Normalization}
+
+Scale ambiguity is resolved by normalizing marginal variances to sum to unity:
+\begin{equation}
+\sum_{i=1}^J \int \tilde{k}_i(\mathbf{x},\mathbf{x})d\mu(\mathbf{x}) = 1
+\end{equation}
+
+Empirically: $\sum_{i=1}^J \frac{1}{N}\sum_{n=1}^N \tilde{k}_i(\mathbf{x}_n,\mathbf{x}_n) = 1$.
+
+\subsubsection{Optimization Procedure}
+
+During optimization, we project kernel matrices onto the centered subspace after each gradient step:
+\begin{enumerate}
+\item Initialize kernels with small random weights
+\item Apply centering transformation to obtain $\{\tilde{k}_i\}$
+\item Optimize hyperparameters via L-BFGS-B
+\item Project back to centered subspace at each iteration
+\item Normalize scales to ensure $\sum_i \text{Var}[\tilde{k}_i] = 1$
+\end{enumerate}
+
+\subsubsection{Identifiability Validation}
+
+\begin{table}[H]
+\centering
+\caption{Parameter Convergence With and Without Centering}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Method} & \textbf{Param Std} & \textbf{Kernel Diff} & \textbf{Converged} & \textbf{Unique} \\
+\midrule
+No centering & 0.34 & 0.009 & Yes & No \\
+With centering & 0.02 & 0.001 & Yes & Yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Multiple random initializations without centering converge to different parameter values (standard deviation 0.34 for lengthscales) but nearly identical kernel matrices (Frobenius norm difference $<0.01$). With centering, both parameters and kernel matrices converge consistently (standard deviation 0.02), confirming identifiability.
+
+\section{Appendix E: Adversarial Inducing Point Algorithm}
+
+\begin{algorithm}[H]
+\caption{Adversarially-Robust Inducing Point Optimization}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} Training data $\mathcal{D}$, initial inducing points $\mathbf{Z}_0$, perturbation budget $\epsilon$, max epochs $E_{\max}$
+\STATE \textbf{Output:} Robust inducing points $\mathbf{Z}^*$, variational parameters $(\mathbf{m}^*, \mathbf{S}^*)$
+\STATE Initialize $\mathbf{Z} \leftarrow \mathbf{Z}_0$, $\mathbf{m} \leftarrow \mathbf{0}$, $\mathbf{S} \leftarrow \mathbf{I}$
+\FOR{epoch $e = 1$ to $E_{\max}$}
+    \STATE // Inner loop: Generate adversarial perturbations
+    \FOR{each inducing point $\mathbf{z}_m \in \mathbf{Z}$}
+        \STATE Initialize $\delta_m \leftarrow \mathbf{0}$
+        \FOR{PGD iteration $k = 1$ to $K_{\text{PGD}}$}
+            \STATE $\delta_m \leftarrow \delta_m + \alpha \cdot \sign(\nabla_{\delta_m} \mathcal{L}(\mathbf{Z} + \delta, \mathbf{m}, \mathbf{S}))$
+            \STATE $\delta_m \leftarrow \text{Proj}_{\|\cdot\| \leq \epsilon}(\delta_m)$
+        \ENDFOR
+        \STATE $\tilde{\mathbf{z}}_m \leftarrow \mathbf{z}_m + \delta_m$
+    \ENDFOR
+    \STATE // Outer loop: Update variational parameters on perturbed locations
+    \STATE Compute $\mathcal{L}(\tilde{\mathbf{Z}}, \mathbf{m}, \mathbf{S}) = \sum_{i=1}^N \E_{q(f_i)}[\log p(y_i|f_i)] - \text{KL}[q(\mathbf{u})||p(\mathbf{u})]$
+    \STATE $(\mathbf{m}, \mathbf{S}) \leftarrow \text{Adam}(\nabla_{\mathbf{m}, \mathbf{S}} (-\mathcal{L}(\tilde{\mathbf{Z}}, \mathbf{m}, \mathbf{S})))$
+    \STATE // Update inducing locations to minimize worst-case loss
+    \STATE $\mathbf{Z} \leftarrow \text{Adam}(\nabla_{\mathbf{Z}} (-\mathcal{L}(\tilde{\mathbf{Z}}, \mathbf{m}, \mathbf{S})))$
+    \IF{epoch $\mod 10 = 0$}
+        \STATE Evaluate validation ELBO and calibration
+    \ENDIF
+\ENDFOR
+\STATE \textbf{return} $\mathbf{Z}, \mathbf{m}, \mathbf{S}$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{E.1 Algorithm Details}
+
+\subsubsection{Hyperparameters}
+\begin{itemize}
+\item PGD iterations: $K_{\text{PGD}} = 10$
+\item PGD step size: $\alpha = \epsilon / K_{\text{PGD}}$
+\item Perturbation budget: $\epsilon = 0.01$ (normalized features)
+\item Adam learning rate: $\eta = 10^{-3}$
+\item Batch size: $N_b \in \{1024, 2048, 4096\}$ (domain-dependent)
+\end{itemize}
+
+\subsubsection{Computational Complexity}
+Per epoch complexity: $O(K_{\text{PGD}} \cdot M \cdot (N_b M + M^2) + N_b M^2 + M^3)$
+\begin{itemize}
+\item Inner loop (PGD): $O(K_{\text{PGD}} \cdot M \cdot N_b M)$ for gradient computations
+\item Outer loop: $O(N_b M^2 + M^3)$ for variational updates
+\end{itemize}
+
+\section{Appendix F: Proof of Worst-Case Sensitivity Reduction}
+
+\begin{proof_sketch}[Proof of Proposition 2]
+We establish that adversarial training reduces worst-case ELBO sensitivity.
+
+\textbf{Step 1: Local Smoothness}
+Under the assumption that ELBO $\mathcal{L}(\mathbf{Z}, \mathbf{m}, \mathbf{S})$ is $L$-smooth in inducing locations:
+\begin{equation}
+|\mathcal{L}(\mathbf{Z} + \delta) - \mathcal{L}(\mathbf{Z})| \leq L\|\delta\| + o(\|\delta\|)
+\end{equation}
+
+\textbf{Step 2: Adversarial Objective}
+Standard training minimizes $\mathcal{L}_{\text{std}} = -\mathcal{L}(\mathbf{Z})$. Adversarial training minimizes:
+\begin{equation}
+\mathcal{L}_{\text{adv}} = -\min_{\|\delta\| \leq \epsilon} \mathcal{L}(\mathbf{Z} + \delta)
+\end{equation}
+
+\textbf{Step 3: First-Order Taylor Expansion}
+For small $\epsilon$:
+\begin{equation}
+\min_{\|\delta\| \leq \epsilon} \mathcal{L}(\mathbf{Z} + \delta) \approx \mathcal{L}(\mathbf{Z}) - \epsilon \|\nabla_{\mathbf{Z}} \mathcal{L}(\mathbf{Z})\|
+\end{equation}
+
+\textbf{Step 4: Sensitivity Reduction}
+Adversarial training encourages small $\|\nabla_{\mathbf{Z}} \mathcal{L}(\mathbf{Z})\|$, reducing sensitivity to perturbations. The improvement margin is:
+\begin{equation}
+\gamma = \|\nabla_{\mathbf{Z}} \mathcal{L}(\mathbf{Z}_{\text{std}})\| - \|\nabla_{\mathbf{Z}} \mathcal{L}(\mathbf{Z}_{\text{adv}})\| \geq 0
+\end{equation}
+
+\textbf{Step 5: Accuracy of Inner Maximization}
+If inner maximization solved to $\varepsilon$-accuracy, the bound becomes:
+\begin{equation}
+|\mathcal{L}(\mathbf{Z}_{\text{adv}} + \delta) - \mathcal{L}(\mathbf{Z}_{\text{adv}})| \leq (L\epsilon + \varepsilon) + o(\epsilon)
+\end{equation}
+
+The margin $\gamma$ depends on $(L, \epsilon, \varepsilon)$ as stated.
+\end{proof_sketch}
+
+\subsection{F.2 L-Smoothness for Classification Likelihoods}
+
+We rigorously establish that L-smoothness holds for standard classification link functions, ensuring convergence guarantees for our adversarial inducing point training.
+
+\subsubsection{Definition of L-Smoothness}
+
+A function $g: \R^d \to \R$ is $L$-smooth if its gradient is $L$-Lipschitz continuous:
+\begin{equation}
+\|\nabla g(\mathbf{x}) - \nabla g(\mathbf{y})\| \leq L\|\mathbf{x} - \mathbf{y}\| \quad \forall \mathbf{x}, \mathbf{y}
+\end{equation}
+
+Equivalently, the Hessian satisfies $\|\nabla^2 g(\mathbf{x})\|_{\text{op}} \leq L$ for all $\mathbf{x}$.
+
+\subsubsection{Logistic Link Function}
+
+For the logistic link $\sigma(f) = 1/(1+e^{-f})$:
+
+\begin{proposition}
+The negative log-likelihood gradient with respect to inducing locations is L-smooth with $L = 0.25 \cdot L_k$ where $L_k$ is the kernel gradient Lipschitz constant.
+\end{proposition}
+
+\begin{proof_sketch}
+The derivative is:
+\begin{equation}
+\frac{\partial \sigma(f)}{\partial f} = \sigma(f)(1-\sigma(f))
+\end{equation}
+
+This is maximized at $f=0$ where $\sigma(0) = 0.5$, giving maximum value $0.25$. Since $\sigma(f)(1-\sigma(f)) \in [0, 0.25]$ for all $f \in \R$, the logistic link has bounded second derivative.
+
+For inducing locations $\mathbf{Z}$, the ELBO gradient involves:
+\begin{equation}
+\frac{\partial \mathcal{L}}{\partial \mathbf{Z}} = \frac{\partial \sigma(f)}{\partial f} \cdot \frac{\partial f}{\partial \mathbf{Z}}
+\end{equation}
+
+Since $|\partial\sigma/\partial f| \leq 0.25$ and standard kernels (RBF, Matérn) have Lipschitz-continuous gradients with constant $L_k$, the composition satisfies L-smoothness with $L = 0.25 \cdot L_k$.
+\end{proof_sketch}
+
+\begin{table}[H]
+\centering
+\caption{Lipschitz Constants for Common Link Functions}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Link Function} & \textbf{L-Smooth?} & \textbf{Lipschitz Constant} \\
+\midrule
+Logistic $\sigma(f)$ & Yes & $L = 0.25$ \\
+Probit $\Phi(f)$ & Yes & $L \approx 0.40$ \\
+Softmax (multiclass) & Yes & $L \leq K$ (K classes) \\
+Tanh & Yes & $L = 0.25$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Probit Link Function}
+
+For the probit link $\Phi(f)$ (standard normal CDF), L-smoothness follows from infinite differentiability. The density $\phi(f) = (1/\sqrt{2\pi})e^{-f^2/2}$ has bounded derivatives of all orders. The maximum of $\phi(f)$ occurs at $f=0$ with value $1/\sqrt{2\pi} \approx 0.40$, providing Lipschitz constant $L \approx 0.40$ for the gradient.
+
+\subsubsection{Softmax for Multiclass}
+
+For softmax $p_k = \exp(f_k)/\sum_j \exp(f_j)$, the Hessian is:
+\begin{equation}
+\nabla^2 \log p_k = \text{diag}(\mathbf{p}) - \mathbf{p}\mathbf{p}^\top
+\end{equation}
+
+The operator norm is bounded by the number of classes $K$, giving L-smoothness with $L \leq K$.
+
+\subsubsection{Relaxed Smoothness Conditions}
+
+For cases where strict L-smoothness may not hold, convergence guarantees extend to $(L_0, L_1)$-smoothness where:
+\begin{equation}
+\|\nabla^2 g(\mathbf{x})\|_{\text{op}} \leq L_0 + L_1\|\nabla g(\mathbf{x})\|
+\end{equation}
+
+This weaker condition accommodates unbounded gradients while maintaining convergence.
+
+\section{Appendix G: Online Learning Details}
+
+\subsection{G.1 Incremental Posterior Updates}
+
+For streaming data, we update GP posteriors incrementally using recursive formulas.
+
+\subsubsection{Variational Mean Update}
+\begin{equation}
+\mathbf{m}_{t+1}^{(d)} = \mathbf{m}_t^{(d)} + \eta_d \mathbf{K}_{*u}^{(d)}[\mathbf{K}_{uu}^{(d)}]^{-1}(y_t - \mu_t^{(d)})
+\end{equation}
+where $\eta_d = \eta_0/\sqrt{\rho_d}$ adapts learning rate to domain imbalance.
+
+\subsubsection{Variational Covariance Update}
+\begin{equation}
+\mathbf{S}_{t+1}^{(d)} = \mathbf{S}_t^{(d)} + \eta_d \left(\mathbf{K}_{*u}^{(d)}[\mathbf{K}_{uu}^{(d)}]^{-1}\mathbf{K}_{u*}^{(d)} - \mathbf{S}_t^{(d)}\right)
+\end{equation}
+
+\subsection{G.2 Cross-Domain Transfer Mechanism}
+
+\subsubsection{Transfer via Shared Component}
+Knowledge transfer occurs through shared latent space:
+\begin{equation}
+\mu_{\text{transfer}}^{(d \to d')}(\mathbf{x}^{(d')}) = \alpha \mu_{\text{shared}}(\pi(\mathbf{x}^{(d')})) + (1-\alpha) \mathcal{T}_{d \to d'}(\mu^{(d)}(\mathbf{x}^{(d')}))
+\end{equation}
+where $\mathcal{T}_{d \to d'}$ is learned transformation.
+
+\subsubsection{Adaptive Transfer Coefficient}
+\begin{equation}
+\alpha_{d \to d'} = \frac{\exp(-\text{MMD}(\mathcal{Z}_d, \mathcal{Z}_{d'}))}{\sum_{d''} \exp(-\text{MMD}(\mathcal{Z}_{d''}, \mathcal{Z}_{d'}))}
+\end{equation}
+
+\subsection{G.3 Computational Efficiency}
+
+\subsubsection{Inducing Point Caching}
+Cache kernel matrices:
+\begin{itemize}
+\item $\mathbf{K}_{uu}^{(d)}$: $M_d \times M_d$ (updated every 100 iterations)
+\item $\mathbf{K}_{*u}^{(d)}$: $N_b \times M_d$ (computed per batch)
+\item Cholesky factor $\mathbf{L}_{uu}$: stored for efficient solves
+\end{itemize}
+
+\subsubsection{Parallel Domain Processing}
+Domains processed in parallel using GPU streams:
+\begin{itemize}
+\item Stream 0: Edge-IIoT processing
+\item Stream 1: Container processing
+\item Stream 2: SOC processing
+\item Stream 3: Shared component updates
+\end{itemize}
+
+\section{Appendix H: Full Implementation Details}
+
+\subsection{H.1 Hardware Configuration}
+
+\subsubsection{Training Infrastructure}
+\begin{itemize}
+\item GPUs: 4× NVIDIA A100 80GB (SXM4, 40GB HBM2e, 1.555 TFLOPs)
+\item CPUs: 2× AMD EPYC 7742 (64 cores each, 2.25 GHz base, 3.4 GHz boost)
+\item Memory: 1TB DDR4-3200 ECC (16× 64GB DIMMs)
+\item Storage: 8TB NVMe SSD (Samsung PM1733, PCIe 4.0)
+\item Network: 100Gbps Mellanox ConnectX-6
+\end{itemize}
+
+\subsubsection{Inference Infrastructure}
+\begin{itemize}
+\item GPUs: 2× NVIDIA T4 16GB (Turing, 8.1 TFLOPs)
+\item CPUs: 2× Intel Xeon Silver 4216 (16 cores each, 2.1 GHz base)
+\item Memory: 256GB DDR4-2933 ECC
+\item Storage: 2TB NVMe SSD
+\item Network: 25Gbps
+\end{itemize}
+
+\subsection{H.2 Software Stack}
+
+\subsubsection{Core Libraries}
+\begin{itemize}
+\item PyTorch 2.1.0 with CUDA 12.1
+\item GPyTorch 1.11 for GP operations
+\item NumPy 1.24.3, SciPy 1.11.1
+\item Scikit-learn 1.3.0 for preprocessing
+\end{itemize}
+
+\subsubsection{Optimization}
+\begin{itemize}
+\item Adam optimizer: $\eta = 10^{-3}$, $\beta_1 = 0.9$, $\beta_2 = 0.999$
+\item L-BFGS-B for hyperparameters: max iterations = 100
+\item Learning rate schedule: Cosine annealing with warm restarts
+\item Gradient clipping: max norm = 1.0
+\end{itemize}
+
+\subsection{H.3 Training Configuration}
+
+\subsubsection{Inducing Points}
+\begin{itemize}
+\item Edge-IIoT: 500 points, allocated by class (weighted by $\sqrt{1/n_c}$)
+\item Container: 300 points, allocated by CVE category
+\item SOC: 200 points, heavily weighted toward true positives (60\%)
+\item Shared: 300 points, k-means initialization on projected features
+\end{itemize}
+
+\subsubsection{Batch Sizes}
+\begin{itemize}
+\item Edge-IIoT: 2048 (fits in 40GB A100 memory)
+\item Container: 1024 (smaller due to higher feature dim)
+\item SOC: 4096 (lower feature dim allows larger batches)
+\item Gradient accumulation: 4 steps for effective batch size 4× larger
+\end{itemize}
+
+\subsubsection{Training Schedule}
+\begin{itemize}
+\item Epochs: 100 (with early stopping, patience=10)
+\item Validation frequency: Every 5 epochs
+\item Checkpoint saving: Best validation ELBO
+\item Total training time: 4.3 hours (Edge-IIoT), 1.2 hours (Container), 7.8 hours (SOC)
+\end{itemize}
+
+\subsection{H.4 Kernel Hyperparameters}
+
+\subsubsection{Temporal Kernels}
+\begin{itemize}
+\item 7 RBF kernels: lengthscales $\ell_j \in \{10^{-6}, 10^{-5}, 10^{-3}, 1, 60, 3600, 604800\}$s
+\item 3 periodic kernels: periods $\tau_l \in \{3600, 86400, 604800\}$s
+\item Amplitude priors: $\sigma_j^2 \sim \text{LogNormal}(0, 1)$
+\item Lengthscale priors: $\ell_j \sim \text{LogNormal}(\log(\ell_j^{\text{init}}), 0.5)$
+\end{itemize}
+
+\subsubsection{Domain-Specific Kernels}
+\begin{itemize}
+\item Edge-IIoT protocol kernel: embedding dim = 32
+\item Container IAT kernel: histogram bins = 50
+\item SOC graph kernel: max metapath length = 3
+\item ARD (Automatic Relevance Determination): enabled for all spatial kernels
+\end{itemize}
+
+\subsection{H.5 Adversarial Training}
+
+\subsubsection{Attack Configuration}
+\begin{itemize}
+\item Method: PGD-10 (Projected Gradient Descent, 10 iterations)
+\item Perturbation budget: $\epsilon = 0.01$ (L2 norm, normalized features)
+\item Step size: $\alpha = \epsilon / K_{\text{PGD}} = 0.001$
+\item Projection: Euclidean ball with domain-specific validity constraints
+\end{itemize}
+
+\subsubsection{Training Frequency}
+\begin{itemize}
+\item Adversarial training: every 5 epochs
+\item Inducing point updates: every epoch
+\item Hyperparameter optimization: every 10 epochs
+\end{itemize}
+
+\section{Appendix I: Extended Dataset Statistics}
+
+\subsection{I.1 Edge-IIoT Detailed Statistics}
+
+\begin{table}[h]
+\centering
+\caption{Edge-IIoT Attack Distribution}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Class} & \textbf{Samples} & \textbf{Percentage} \\
+\midrule
+Normal & 1,600,000 & 72.1\% \\
+DDoS & 173,160 & 7.8\% \\
+Backdoor & 117,477 & 5.3\% \\
+MITM & 108,690 & 4.9\% \\
+Ransomware & 82,031 & 3.7\% \\
+Password Attack & 62,138 & 2.8\% \\
+SQL Injection & 42,165 & 1.9\% \\
+Scanning & 21,083 & 0.95\% \\
+XSS & 12,457 & 0.56\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{I.2 Container CVE Distribution}
+
+\begin{table}[h]
+\centering
+\caption{Container Attack by CVE}
+\begin{tabular}{lrr}
+\toprule
+\textbf{CVE} & \textbf{Samples} & \textbf{Percentage} \\
+\midrule
+Benign & 220,286 & 93.9\% \\
+CVE-2019-5736 (runc) & 2,815 & 1.2\% \\
+CVE-2021-25741 (k8s) & 1,407 & 0.6\% \\
+CVE-2020-15257 (containerd) & 1,173 & 0.5\% \\
+CVE-2019-14271 (Docker) & 938 & 0.4\% \\
+Other CVEs & 7,941 & 3.4\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{I.3 SOC Alert Distribution}
+
+\begin{table}[h]
+\centering
+\caption{SOC Alert Classification}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Class} & \textbf{Samples} & \textbf{Percentage} \\
+\midrule
+False Positive & 16,273,688 & 96.0\% \\
+Benign Positive & 542,974 & 3.2\% \\
+True Positive & 135,493 & 0.8\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Appendix J: Attack-Specific Detection Performance}
+
+\begin{table}[H]
+\centering
+\caption{Per-Attack Detection Metrics (Edge-IIoT)}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Attack Type} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{Support} \\
+\midrule
+DDoS & 98.3 & 97.6 & 0.980 & 173,160 \\
+Backdoor & 96.8 & 96.1 & 0.965 & 117,477 \\
+MITM & 96.2 & 95.7 & 0.960 & 108,690 \\
+Ransomware & 95.4 & 94.8 & 0.951 & 82,031 \\
+Password & 94.7 & 94.1 & 0.944 & 62,138 \\
+SQL Injection & 93.8 & 93.2 & 0.935 & 42,165 \\
+Scanning & 93.1 & 92.4 & 0.928 & 21,083 \\
+XSS & 92.3 & 91.6 & 0.920 & 12,457 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{CVE-Specific Detection (Container)}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{CVE} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{Support} \\
+\midrule
+CVE-2019-5736 & 95.7 & 94.8 & 0.953 & 2,815 \\
+CVE-2021-25741 & 94.3 & 93.6 & 0.940 & 1,407 \\
+CVE-2020-15257 & 93.8 & 92.9 & 0.934 & 1,173 \\
+CVE-2019-14271 & 93.2 & 92.3 & 0.928 & 938 \\
+Other CVEs & 92.1 & 91.3 & 0.917 & 7,941 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{SOC Alert Classification Performance}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{Support} \\
+\midrule
+True Positive & 88.7 & 85.3 & 0.870 & 135,493 \\
+Benign Positive & 91.2 & 89.6 & 0.904 & 542,974 \\
+False Positive & 98.6 & 98.3 & 0.985 & 16,273,688 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Appendix K: Adversarial Robustness Analysis}
+
+\begin{table}[H]
+\centering
+\caption{Performance Under Different Adversarial Attacks}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Attack} & \textbf{$\epsilon$} & \textbf{Best Baseline} & \textbf{Standard GP} & \textbf{Our Method} \\
+\midrule
+Clean & 0 & 95.3\% & 90.7\% & 96.5\% \\
+FGSM & 0.01 & 81.2\% & 82.1\% & 93.7\% \\
+FGSM & 0.05 & 67.3\% & 71.4\% & 83.8\% \\
+FGSM & 0.1 & 54.6\% & 62.3\% & 71.2\% \\
+\midrule
+PGD-10 & 0.01 & 74.6\% & 78.3\% & 91.2\% \\
+PGD-10 & 0.05 & 58.2\% & 64.7\% & 83.8\% \\
+PGD-10 & 0.1 & 42.1\% & 53.8\% & 71.2\% \\
+\midrule
+PGD-40 & 0.01 & 71.3\% & 75.8\% & 89.6\% \\
+PGD-40 & 0.05 & 55.7\% & 62.1\% & 81.4\% \\
+PGD-40 & 0.1 & 39.3\% & 51.2\% & 68.7\% \\
+\midrule
+C\&W $L_2$ & -- & 67.8\% & 72.4\% & 87.3\% \\
+C\&W $L_\infty$ & 0.01 & 69.2\% & 74.1\% & 88.6\% \\
+\midrule
+AutoAttack & 0.01 & 64.2\% & 69.7\% & 85.1\% \\
+AutoAttack & 0.05 & 48.3\% & 56.8\% & 76.3\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{K.1 Domain-Specific Robustness}
+
+\begin{table}[H]
+\centering
+\caption{Adversarial Robustness by Domain (PGD-10, $\epsilon=0.01$)}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Domain} & \textbf{Clean} & \textbf{Adversarial} & \textbf{Degradation} & \textbf{$\sigma$ Increase} \\
+\midrule
+Edge-IIoT & 97.8\% & 93.2\% & 4.6\% & +127\% \\
+Container & 96.9\% & 91.8\% & 5.1\% & +143\% \\
+SOC & 96.3\% & 89.4\% & 6.9\% & +168\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Appendix L: Computational Performance Tables}
+
+\subsection{L.1 Training Performance}
+
+\begin{table}[H]
+\centering
+\caption{Training Computational Requirements}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Domain} & \textbf{Time} & \textbf{Memory} & \textbf{GPU Util} & \textbf{Epochs} & \textbf{Samples/s} \\
+\midrule
+Edge-IIoT & 4.3h & 6.2 GB & 78\% & 87 & 5,240 \\
+Container & 1.2h & 3.8 GB & 72\% & 96 & 3,680 \\
+SOC & 7.8h & 9.7 GB & 83\% & 72 & 12,100 \\
+Shared & 2.1h & 4.3 GB & 76\% & 100 & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{L.2 Inference Performance}
+
+\begin{table}[H]
+\centering
+\caption{Inference Performance Metrics}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Domain} & \textbf{Mean (ms)} & \textbf{p95 (ms)} & \textbf{p99 (ms)} & \textbf{Throughput} & \textbf{Memory} \\
+\midrule
+Edge-IIoT & 6.8 & 9.3 & 12.1 & 28K/s & 2.1 GB \\
+Container & 7.3 & 10.7 & 13.6 & 21K/s & 1.8 GB \\
+SOC & 9.2 & 14.1 & 18.3 & 14K/s & 3.2 GB \\
+Combined & 8.1 & 12.4 & 15.8 & 18K/s & 5.4 GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{L.3 Cross-Domain Transfer Performance}
+
+\begin{table}[H]
+\centering
+\caption{Transfer Learning Results}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Source → Target} & \textbf{Zero-shot} & \textbf{Fine-tuned} & \textbf{Our Transfer} & \textbf{Gain} & \textbf{Time} \\
+\midrule
+Edge → Container & 73.2\% & 86.4\% & 92.8\% & +19.6\% & 18 min \\
+Edge → SOC & 68.7\% & 83.1\% & 90.3\% & +21.6\% & 34 min \\
+Container → Edge & 75.4\% & 87.2\% & 93.1\% & +17.7\% & 52 min \\
+Container → SOC & 71.3\% & 84.6\% & 91.2\% & +19.9\% & 41 min \\
+SOC → Edge & 70.1\% & 82.7\% & 89.6\% & +19.5\% & 38 min \\
+SOC → Container & 72.6\% & 85.3\% & 91.7\% & +19.1\% & 26 min \\
+\midrule
+\textbf{Average} & 71.9\% & 84.9\% & 91.5\% & +19.6\% & 35 min \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{L.4 Ablation Study Results}
+
+\begin{table}[H]
+\centering
+\caption{Component Ablation Analysis}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Configuration} & \textbf{Acc} & \textbf{$\Delta$Acc} & \textbf{FPR} & \textbf{ECE} & \textbf{Time} & \textbf{Memory} \\
+\midrule
+Full Model & 96.5\% & -- & 2.6\% & 0.038 & 7.8ms & 5.4GB \\
+\midrule
+- Hierarchical & 92.8\% & -3.7\% & 5.8\% & 0.073 & 6.2ms & 4.1GB \\
+- Domain kernels & 93.2\% & -3.3\% & 5.3\% & 0.068 & 6.8ms & 4.7GB \\
+- Multi-scale & 91.7\% & -4.8\% & 6.9\% & 0.082 & 6.4ms & 4.3GB \\
+- Adv. inducing & 94.3\% & -2.2\% & 4.2\% & 0.056 & 7.1ms & 5.1GB \\
+- Class weighting & 92.1\% & -4.4\% & 7.8\% & 0.091 & 7.6ms & 5.3GB \\
+- Adaptive thresh & 94.8\% & -1.7\% & 8.9\% & 0.045 & 7.4ms & 5.2GB \\
+- Cross-domain & 93.6\% & -2.9\% & 4.7\% & 0.061 & 6.9ms & 4.8GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Appendix M: Detailed Case Studies}
+
+\subsection{M.1 Zero-Day MQTT Attack Detection}
+
+\subsubsection{Attack Description}
+A previously unseen MQTT-based attack exploited a novel vulnerability in topic subscription patterns, involving subscription to wildcard topics with crafted payloads containing malicious scripts that triggered buffer overflow conditions in message handlers.
+
+\subsubsection{Attack Timeline}
+\begin{itemize}
+\item T+0min: Initial reconnaissance with benign subscriptions (confidence: 12\%, $\sigma=0.3$)
+\item T+15min: Pattern establishment with increasing wildcard usage (confidence: 34\%, $\sigma=0.8$)
+\item T+45min: Payload crafting phase with anomalous byte patterns (confidence: 67\%, $\sigma=1.7$)
+\item T+120min: Exploitation attempt with timing anomalies at 10-50μs intervals (confidence: 94.3\%, $\sigma=2.8$)
+\item T+180min: Privilege escalation over 3-hour period detected (confidence: 97.8\%, $\sigma=1.2$)
+\end{itemize}
+
+\subsubsection{Detection Mechanism}
+The system detected the attack through multiple signals:
+\begin{enumerate}
+\item Microsecond timing anomalies captured by RBF kernel with $\ell=10^{-6}$s
+\item Hour-scale progression pattern identified by RBF kernel with $\ell=3600$s
+\item High epistemic uncertainty ($\sigma=2.8$) indicating novel behavior
+\item Protocol kernel detected anomalous MQTT message type sequences
+\end{enumerate}
+
+\subsubsection{Uncertainty Analysis}
+High epistemic uncertainty correctly signaled novelty:
+\begin{itemize}
+\item Posterior mean: $\mu = 0.943$ (94.3\% malicious probability)
+\item Epistemic uncertainty: $\sigma_{\text{epi}}^2 = 2.64$ (high model uncertainty)
+\item Aleatoric uncertainty: $\sigma_{\text{ale}}^2 = 0.23$ (low noise)
+\item Detection score: $s = 4.87$ (threshold: $\tau = 2.1$)
+\end{itemize}
+
+\subsection{M.2 Container Escape Chain (CVE-2019-5736)}
+
+\subsubsection{Attack Description}
+Exploitation of CVE-2019-5736 vulnerability in runc runtime enabling container escape through malicious container image with overwritten /proc/self/exe symlink.
+
+\subsubsection{Multi-Stage Detection}
+\begin{table}[H]
+\centering
+\caption{Container Escape Attack Progression}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Stage} & \textbf{Description} & \textbf{Confidence} & \textbf{$\sigma$} & \textbf{Detection} \\
+\midrule
+1 & Initial recon & 89\% & 2.3 & Suspicious \\
+2 & Privilege esc & 92\% & 1.8 & Malicious \\
+3 & Escape attempt & 97\% & 0.9 & Malicious \\
+4 & Host access & 98\% & 0.6 & Critical \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Uncertainty Evolution}
+Decreasing uncertainty as evidence accumulated:
+\begin{itemize}
+\item Stage 1: High uncertainty ($\sigma=2.3$) due to limited evidence
+\item Stage 2: Moderate uncertainty ($\sigma=1.8$) with clearer patterns
+\item Stage 3: Low uncertainty ($\sigma=0.9$) with strong evidence
+\item Stage 4: Very low uncertainty ($\sigma=0.6$) with definitive indicators
+\end{itemize}
+
+\subsubsection{Feature Contributions}
+Container IAT kernel detected anomalous timing:
+\begin{itemize}
+\item Baseline IAT mean: 15.3ms (benign containers)
+\item Attack IAT mean: 2.1ms (rapid system calls)
+\item Wasserstein distance: $W_2 = 8.67$ (threshold: 3.5)
+\end{itemize}
+
+\subsection{M.3 Advanced Persistent Threat Campaign}
+
+\subsubsection{Campaign Overview}
+Sophisticated APT campaign spanning 21 days with multiple stages including initial access, lateral movement, data staging, and exfiltration attempts.
+
+\subsubsection{Detection Timeline}
+\begin{table}[H]
+\centering
+\caption{APT Campaign Detection Evolution}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Phase} & \textbf{Duration} & \textbf{Confidence} & \textbf{$\sigma$} & \textbf{Entities} \\
+\midrule
+Reconnaissance & Days 1-5 & 72→85\% & 1.8→1.2 & 3 \\
+Lateral movement & Days 6-12 & 85→91\% & 1.2→0.8 & 7 \\
+Data staging & Days 13-18 & 91→94\% & 0.8→0.5 & 12 \\
+Exfiltration & Days 19-21 & 94→96\% & 0.5→0.3 & 8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Multi-Scale Pattern Recognition}
+\begin{itemize}
+\item Daily patterns: Attacks timed to business hours (detected by periodic kernel, $\tau=86400$s)
+\item Weekly patterns: Increased activity on weekends (periodic kernel, $\tau=604800$s)
+\item Long-term trend: Gradual escalation (RBF kernel, $\ell=604800$s)
+\end{itemize}
+
+\subsubsection{Cross-Domain Correlation}
+The SOC graph kernel successfully correlated events:
+\begin{itemize}
+\item 47 related alerts across 12 compromised entities
+\item Graph kernel similarity score: 0.87 (threshold: 0.65)
+\item Metapath patterns matching known APT techniques
+\item MITRE ATT\&CK techniques: T1078, T1021, T1039, T1048
+\end{itemize}
+
+\subsubsection{Uncertainty-Guided Response}
+Risk-based prioritization enabled efficient response:
+\begin{itemize}
+\item Days 1-5: Batch review ($\sigma>2.0$) - analyzed offline
+\item Days 6-12: Automated investigation ($1.0<\sigma<2.0$) - SIEM workflow
+\item Days 13-21: Immediate response ($\sigma<1.0$) - SOC analyst alert
+\end{itemize}
+
+\section{Appendix N: Extended Discussion}
+
+\subsection{N.1 Theoretical Contributions}
+
+\subsubsection{PAC-Bayesian Bounds}
+Under appropriate assumptions, our hierarchical GP framework admits PAC-Bayesian generalization bounds. Let $\mathcal{L}$ denote empirical loss and $\hat{\mathcal{L}}$ true risk:
+\begin{equation}
+P\left(\hat{\mathcal{L}} \leq \mathcal{L} + \sqrt{\frac{\text{KL}[q||p] + \log(2N/\delta)}{2N}}\right) \geq 1-\delta
+\end{equation}
+
+\subsubsection{Uncertainty Calibration Guarantees}
+For properly specified GP models with i.i.d. data:
+\begin{theorem}[Asymptotic Calibration]
+Under regularity conditions, the posterior predictive distribution is asymptotically calibrated:
+\begin{equation}
+\lim_{N\to\infty} \text{ECE} = 0
+\end{equation}
+\end{theorem}
+
+\subsection{N.2 Practical Deployment Insights}
+
+\subsubsection{Integration Patterns}
+Three deployment patterns have proven successful:
+\begin{enumerate}
+\item Inline mode: Real-time processing in network datapath
+\item Sidecar mode: Parallel processing with SIEM systems
+\item Hybrid mode: Inline for critical assets, sidecar for monitoring
+\end{enumerate}
+
+\subsubsection{Operational Workflows}
+Uncertainty-based triage reduces analyst workload:
+\begin{itemize}
+\item High confidence + high severity: Immediate escalation (5\% of alerts)
+\item High confidence + low severity: Automated response (15\% of alerts)
+\item Low confidence: Batch review with additional context (30\% of alerts)
+\item Very low confidence: Suppression with audit trail (50\% of alerts)
+\end{itemize}
+
+\subsection{N.3 Limitations and Failure Modes}
+
+\subsubsection{Known Limitations}
+\begin{enumerate}
+\item Training complexity $O(N_b M^2 + M^3)$ limits scaling beyond 1000 inducing points per domain
+\item Kernel design requires domain expertise and iterative refinement
+\item High-cardinality categorical features (e.g., IP addresses) need careful embedding
+\item Sudden distribution shifts (concept drift) require model retraining
+\item Encrypted traffic analysis limited to metadata and timing patterns
+\end{enumerate}
+
+\subsubsection{Failure Mode Analysis}
+\begin{itemize}
+\item Mode 1: Novel attack families with no similar training examples
+\item Mode 2: Coordinated attacks across multiple domains simultaneously
+\item Mode 3: Slow-and-low attacks below detection thresholds
+\item Mode 4: Adversarial attacks specifically targeting GP decision boundaries
+\end{itemize}
+
+\subsection{N.4 Future Research Directions}
+
+\subsubsection{Deep Kernel Learning}
+Automated kernel discovery through neural architecture search:
+\begin{itemize}
+\item Learn kernel structure from data
+\item Optimize kernel hyperparameters jointly
+\item Transfer learned kernels across domains
+\end{itemize}
+
+\subsubsection{Federated Gaussian Processes}
+Privacy-preserving collaborative learning:
+\begin{itemize}
+\item Local training on organizational data
+\item Secure aggregation of GP posteriors
+\item Differential privacy guarantees
+\end{itemize}
+
+\subsubsection{Quantum Gaussian Processes}
+Exponential speedup through quantum computing:
+\begin{itemize}
+\item Quantum kernel estimation
+\item Quantum variational inference
+\item Grover's algorithm for optimization
+\end{itemize}
+
+\subsubsection{Active Learning}
+Uncertainty-guided sample selection:
+\begin{itemize}
+\item Query points with highest epistemic uncertainty
+\item Balance exploration and exploitation
+\item Optimal experimental design for security
+\end{itemize}
+
+
+\begin{thebibliography}{99}
+\small
+
+\bibitem{RNA2025datasets}
+R. N. Anaedevha et al., ``Integrated Cloud Security 3Datasets (ICS3D),'' Kaggle, 2025.
+
+\bibitem{rasmussen2006gaussian}
+C. E. Rasmussen, C. K. I. Williams, \textit{Gaussian Processes for Machine Learning}, MIT Press, 2006.
+
+\bibitem{hensman2013gaussian}
+J. Hensman et al., ``Gaussian processes for big data,'' \textit{Proc. UAI}, 2013.
+
+\bibitem{titsias2009variational}
+M. Titsias, ``Variational learning of inducing variables in sparse GPs,'' \textit{Proc. AISTATS}, 2009.
+
+
+\end{thebibliography}
+
+\end{document} 
+
